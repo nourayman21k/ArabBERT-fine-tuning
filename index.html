@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AraBERT Sentiment Analysis</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg-primary: #ffffff;
+      --bg-secondary: #f8f8f7;
+      --bg-tertiary: #f1f0eb;
+      --text-primary: #1a1a1a;
+      --text-secondary: #6b6b6b;
+      --text-tertiary: #a0a0a0;
+      --border-light: rgba(0,0,0,0.1);
+      --border-medium: rgba(0,0,0,0.15);
+      --radius-md: 8px;
+      --radius-lg: 12px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-primary: #1e1e1e;
+        --bg-secondary: #2a2a2a;
+        --bg-tertiary: #333;
+        --text-primary: #f0f0f0;
+        --text-secondary: #aaa;
+        --text-tertiary: #666;
+        --border-light: rgba(255,255,255,0.1);
+        --border-medium: rgba(255,255,255,0.18);
+      }
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg-tertiary); min-height: 100vh; display: flex; align-items: flex-start; justify-content: center; padding: 2rem 1rem; }
+    .wrap { width: 100%; max-width: 680px; }
+    .header { text-align: center; margin-bottom: 2rem; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; background: var(--bg-primary); border: 0.5px solid var(--border-light); border-radius: 999px; padding: 4px 14px; font-size: 12px; color: var(--text-secondary); margin-bottom: 1rem; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; animation: pulse 1.5s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(0.85)} }
+    .header h1 { font-size: 26px; font-weight: 500; color: var(--text-primary); margin-bottom: 6px; letter-spacing: -0.3px; }
+    .header p { font-size: 14px; color: var(--text-secondary); }
+    .input-card { background: var(--bg-primary); border: 0.5px solid var(--border-light); border-radius: var(--radius-lg); padding: 1.25rem; margin-bottom: 1rem; }
+    .input-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; letter-spacing: 0.4px; text-transform: uppercase; direction: ltr; }
+    textarea { width: 100%; min-height: 110px; border: 0.5px solid var(--border-medium); border-radius: var(--radius-md); padding: 12px 14px; font-size: 16px; font-family: inherit; color: var(--text-primary); background: var(--bg-secondary); resize: none; direction: rtl; line-height: 1.7; outline: none; transition: border-color 0.15s; }
+    textarea:focus { border-color: var(--text-secondary); }
+    textarea::placeholder { color: var(--text-tertiary); font-size: 15px; }
+    .actions { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; direction: ltr; }
+    .char-count { font-size: 12px; color: var(--text-tertiary); }
+    .btn-analyze { display: inline-flex; align-items: center; gap: 8px; background: var(--text-primary); color: var(--bg-primary); border: none; border-radius: var(--radius-md); padding: 9px 20px; font-size: 14px; font-weight: 500; cursor: pointer; transition: opacity 0.15s, transform 0.1s; }
+    .btn-analyze:hover { opacity: 0.85; }
+    .btn-analyze:active { transform: scale(0.97); }
+    .btn-analyze:disabled { opacity: 0.4; cursor: not-allowed; }
+    .spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .result-card { background: var(--bg-primary); border: 0.5px solid var(--border-light); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 1rem; animation: slideUp 0.3s ease; }
+    @keyframes slideUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    .result-header { padding: 1.25rem 1.25rem 1rem; border-bottom: 0.5px solid var(--border-light); display: flex; align-items: center; gap: 14px; direction: ltr; }
+    .sentiment-icon { width: 48px; height: 48px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+    .sentiment-icon.positive { background: #dcfce7; }
+    .sentiment-icon.negative { background: #fee2e2; }
+    .sentiment-icon.neutral { background: #f1f5f9; }
+    .result-label-wrap { flex: 1; }
+    .result-label { font-size: 20px; font-weight: 500; color: var(--text-primary); margin-bottom: 2px; }
+    .result-sublabel { font-size: 13px; color: var(--text-secondary); }
+    .confidence-pill { display: inline-flex; align-items: center; background: var(--bg-secondary); border: 0.5px solid var(--border-light); border-radius: 999px; padding: 5px 12px; font-size: 13px; font-weight: 500; color: var(--text-primary); }
+    .result-body { padding: 1.25rem; }
+    .bars-title { font-size: 11px; color: var(--text-tertiary); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 14px; }
+    .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; direction: ltr; }
+    .bar-name { font-size: 13px; color: var(--text-secondary); width: 62px; flex-shrink: 0; }
+    .bar-track { flex: 1; height: 6px; background: var(--bg-secondary); border-radius: 999px; overflow: hidden; border: 0.5px solid var(--border-light); }
+    .bar-fill { height: 100%; border-radius: 999px; transition: width 0.6s cubic-bezier(0.4,0,0.2,1); }
+    .bar-fill.positive { background: #22c55e; }
+    .bar-fill.negative { background: #ef4444; }
+    .bar-fill.neutral { background: #94a3b8; }
+    .bar-pct { font-size: 12px; color: var(--text-secondary); width: 38px; text-align: right; flex-shrink: 0; }
+    .result-footer { padding: 0.75rem 1.25rem; border-top: 0.5px solid var(--border-light); display: flex; align-items: center; justify-content: space-between; direction: ltr; }
+    .footer-stat { font-size: 12px; color: var(--text-tertiary); }
+    .footer-stat span { color: var(--text-secondary); font-weight: 500; }
+    .presets { margin-bottom: 1rem; }
+    .presets-label { font-size: 12px; color: var(--text-tertiary); margin-bottom: 8px; direction: ltr; }
+    .preset-chips { display: flex; flex-wrap: wrap; gap: 6px; direction: rtl; }
+    .chip { background: var(--bg-primary); border: 0.5px solid var(--border-light); border-radius: 999px; padding: 5px 12px; font-size: 13px; color: var(--text-secondary); cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+    .chip:hover { background: var(--bg-secondary); border-color: var(--border-medium); color: var(--text-primary); }
+    .error-card { background: #fee2e2; border: 0.5px solid #fca5a5; border-radius: var(--radius-md); padding: 12px 16px; font-size: 13px; color: #b91c1c; margin-bottom: 1rem; animation: slideUp 0.2s ease; direction: ltr; }
+    .history-section { margin-top: 1.5rem; }
+    .history-title { font-size: 12px; color: var(--text-tertiary); letter-spacing: 0.4px; text-transform: uppercase; margin-bottom: 10px; direction: ltr; }
+    .history-list { display: flex; flex-direction: column; gap: 6px; }
+    .history-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--bg-secondary); border-radius: var(--radius-md); border: 0.5px solid var(--border-light); cursor: pointer; transition: border-color 0.15s; direction: ltr; }
+    .history-item:hover { border-color: var(--border-medium); }
+    .h-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .h-dot.positive { background: #22c55e; }
+    .h-dot.negative { background: #ef4444; }
+    .h-dot.neutral { background: #94a3b8; }
+    .h-text { flex: 1; font-size: 13px; color: var(--text-secondary); direction: rtl; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+    .h-label { font-size: 11px; color: var(--text-tertiary); flex-shrink: 0; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div class="badge"><div class="dot"></div> model ready — arabert-sentiment-v1</div>
+    <h1>Arabic sentiment analysis</h1>
+    <p>Powered by your fine-tuned AraBERT model · 89% accuracy</p>
+  </div>
+
+  <div class="presets">
+    <div class="presets-label">Try an example</div>
+    <div class="preset-chips">
+      <div class="chip" onclick="setPreset(this)">المنتج رائع جداً وأنصح به الجميع</div>
+      <div class="chip" onclick="setPreset(this)">الخدمة كانت سيئة للغاية ولن أعود</div>
+      <div class="chip" onclick="setPreset(this)">الطلب وصل في الموعد المحدد</div>
+      <div class="chip" onclick="setPreset(this)">لم أكن راضياً عن جودة التغليف</div>
+    </div>
+  </div>
+
+  <div class="input-card">
+    <div class="input-label">Enter Arabic text</div>
+    <textarea id="txt" placeholder="اكتب نصاً عربياً للتحليل..." oninput="updateCount()"></textarea>
+    <div class="actions">
+      <span class="char-count" id="char-count">0 characters</span>
+      <button class="btn-analyze" id="btn" onclick="analyze()">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 8h12M8 2l6 6-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Analyze
+      </button>
+    </div>
+  </div>
+
+  <div id="error-area"></div>
+  <div id="result-area"></div>
+
+  <div id="history-section" class="history-section" style="display:none;">
+    <div class="history-title">Recent analyses</div>
+    <div class="history-list" id="history-list"></div>
+  </div>
+</div>
+
+<script>
+const labelMap = {
+  positive: { ar: 'إيجابي', cls: 'positive' },
+  negative: { ar: 'سلبي',   cls: 'negative' },
+  neutral:  { ar: 'محايد',  cls: 'neutral'  }
+};
+let history = [];
+
+function updateCount() {
+  document.getElementById('char-count').textContent = document.getElementById('txt').value.length + ' characters';
+}
+
+function setPreset(el) {
+  document.getElementById('txt').value = el.textContent.trim();
+  updateCount();
+  document.getElementById('txt').focus();
+}
+
+async function analyze() {
+  const text = document.getElementById('txt').value.trim();
+  if (!text) return;
+  const btn = document.getElementById('btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Analyzing…';
+  document.getElementById('error-area').innerHTML = '';
+  document.getElementById('result-area').innerHTML = '';
+
+  try {
+    const res = await fetch('/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    if (!res.ok) throw new Error('Server returned ' + res.status);
+    const d = await res.json();
+
+    // ── field names match main.py exactly ──
+    // d.label, d.emoji, d.confidence, d.scores.positive/neutral/negative, d.inference_ms
+    const label = (d.label || '').toLowerCase();
+    const info  = labelMap[label] || { ar: label, cls: 'neutral' };
+    const conf  = Math.round((d.confidence || 0) * 100);
+    const posP  = Math.round((d.scores?.positive || 0) * 100);
+    const neuP  = Math.round((d.scores?.neutral  || 0) * 100);
+    const negP  = Math.round((d.scores?.negative || 0) * 100);
+    const inferMs = d.inference_ms ? d.inference_ms.toFixed(1) : '—';
+
+    document.getElementById('result-area').innerHTML = `
+      <div class="result-card">
+        <div class="result-header">
+          <div class="sentiment-icon ${info.cls}">${d.emoji || ''}</div>
+          <div class="result-label-wrap">
+            <div class="result-label">${info.ar} — ${label.charAt(0).toUpperCase()+label.slice(1)}</div>
+            <div class="result-sublabel">Classification result</div>
+          </div>
+          <div class="confidence-pill">${conf}% confident</div>
+        </div>
+        <div class="result-body">
+          <div class="bars-title">Class probabilities</div>
+          <div class="bar-row"><span class="bar-name">Positive</span><div class="bar-track"><div class="bar-fill positive" id="bp" style="width:0%"></div></div><span class="bar-pct">${posP}%</span></div>
+          <div class="bar-row"><span class="bar-name">Neutral</span><div class="bar-track"><div class="bar-fill neutral" id="bn" style="width:0%"></div></div><span class="bar-pct">${neuP}%</span></div>
+          <div class="bar-row"><span class="bar-name">Negative</span><div class="bar-track"><div class="bar-fill negative" id="bneg" style="width:0%"></div></div><span class="bar-pct">${negP}%</span></div>
+        </div>
+        <div class="result-footer">
+          <span class="footer-stat">Inference <span>${inferMs}ms</span></span>
+          <span class="footer-stat">Model <span>arabert-base</span></span>
+          <span class="footer-stat">Characters <span>${text.length}</span></span>
+        </div>
+      </div>`;
+
+    setTimeout(() => {
+      const bp   = document.getElementById('bp');   if(bp)   bp.style.width   = posP + '%';
+      const bn   = document.getElementById('bn');   if(bn)   bn.style.width   = neuP + '%';
+      const bneg = document.getElementById('bneg'); if(bneg) bneg.style.width = negP + '%';
+    }, 50);
+
+    history.unshift({ text, label, info, emoji: d.emoji });
+    if (history.length > 5) history.pop();
+    renderHistory();
+
+  } catch (e) {
+    document.getElementById('error-area').innerHTML = `<div class="error-card">Could not reach the API — make sure <strong>docker compose up</strong> is running.<br><small>${e.message}</small></div>`;
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 8h12M8 2l6 6-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Analyze';
+}
+
+function renderHistory() {
+  if (!history.length) return;
+  document.getElementById('history-section').style.display = 'block';
+  document.getElementById('history-list').innerHTML = history.map((h,i) => `
+    <div class="history-item" onclick="reuseHistory(${i})">
+      <div class="h-dot ${h.info.cls}"></div>
+      <div class="h-text">${h.text}</div>
+      <div class="h-label">${h.info.ar}</div>
+    </div>`).join('');
+}
+
+function reuseHistory(i) {
+  document.getElementById('txt').value = history[i].text;
+  updateCount();
+}
+
+document.getElementById('txt').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) analyze();
+});
+</script>
+</body>
+</html>

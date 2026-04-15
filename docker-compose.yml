@@ -1,0 +1,51 @@
+
+
+services:
+
+  # ── CPU service (default) ───────────────────────────────────────────────────
+  arabert-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: arabert-sentiment:latest
+    container_name: arabert-sentiment-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount your model directory here (keeps image small)
+      - ./model:/app/model:ro
+    environment:
+      - MODEL_DIR=/app/model
+      - MAX_LENGTH=512
+      - PORT=8000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ── GPU service (use: docker compose --profile gpu up) ─────────────────────
+  arabert-api-gpu:
+    profiles: ["gpu"]
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    image: arabert-sentiment-gpu:latest
+    container_name: arabert-sentiment-api-gpu
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./model:/app/model:ro
+    environment:
+      - MODEL_DIR=/app/model
+      - MAX_LENGTH=512
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
