@@ -104,10 +104,3 @@ Open **http://localhost:8000/docs** in your browser — full Swagger UI.
 | `PORT` | `8000` | Server port |
 
 ---
-
-## Production Tips
-
-- **Scale workers**: Set `--workers 2` in CMD if you have 4+ CPU cores (BERT is not thread-safe with `torch`, so use `--workers 1` and rely on async I/O instead, or use gunicorn with separate processes).
-- **GPU**: Switch to `Dockerfile.gpu` and `requirements-gpu.txt` for ~10x faster inference.
-- **Model as volume vs baked in**: The default `docker-compose.yml` mounts the model as a read-only volume (recommended for large models). To bake it into the image, uncomment the `COPY model/ ./model/` line in the Dockerfile.
-- **Reverse proxy**: Put Nginx or Traefik in front for TLS termination and rate limiting.
